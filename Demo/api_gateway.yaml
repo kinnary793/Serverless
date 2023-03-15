@@ -1,0 +1,231 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Serverless Architecture for performing CRUD operation in DynamoDB via Lambda and Api-Gateway.
+# To use the SAM transform, add AWS::Serverless-2016-10-31 to the Transform section of your CloudFormation template.
+Transform: AWS::Serverless-2016-10-31
+# The AWS Serverless Application Model (SAM) is an open-source framework for building serverless applications. It provides shorthand syntax to express functions, APIs, databases, and event source mappings. With just a few lines per resource, you can define the application you want and model it using YAML. During deployment, SAM transforms and expands the SAM syntax into AWS CloudFormation syntax, enabling you to build serverless applications faster.
+
+Parameters:
+  dynamoDBCRUDWithApiGatewayFunctionArn:
+      Type: String
+      Description: SNS Topic for cloudwatch alarms
+
+Resources:
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      ApiKeySourceType: HEADER
+      EndpointConfiguration:
+        Types:
+          - EDGE  
+      Description: An API Gateway with a Lambda Integration 
+      Name: crud-api
+
+  GetItemsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: 'getitems'
+      RestApiId: !Ref ApiGatewayRestApi
+
+  GetItemsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref GetItemsResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.querystring.tableName : true
+      ApiKeyRequired: false
+      Integration:
+        ConnectionType: INTERNET
+        PassthroughBehavior: WHEN_NO_MATCH
+        Credentials: !GetAtt ApiGatewayIamRole.Arn
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST # For Lambda integrations, you must set the integration method to POST
+        RequestParameters:
+          integration.request.querystring.tableName: method.request.querystring.tableName
+        Uri: !Sub 
+        - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations"
+        - lambdaArn: !Ref dynamoDBCRUDWithApiGatewayFunctionArn
+        
+  GetItemResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !Ref GetItemsResource
+      PathPart: '{id}'
+      RestApiId: !Ref ApiGatewayRestApi
+
+  GetItemMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ResourceId: !Ref GetItemResource
+      RestApiId: !Ref ApiGatewayRestApi
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.querystring.tableName : true
+      HttpMethod: GET
+      Integration:
+        ConnectionType: INTERNET
+        PassthroughBehavior: WHEN_NO_MATCH
+        Credentials: !GetAtt ApiGatewayIamRole.Arn
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        RequestParameters:
+          integration.request.querystring.tableName: method.request.querystring.tableName
+        Uri: !Sub 
+        - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations"
+        - lambdaArn: !Ref dynamoDBCRUDWithApiGatewayFunctionArn
+
+  AddItemResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: 'additem'
+      RestApiId: !Ref ApiGatewayRestApi
+
+  AddItemMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ResourceId: !Ref AddItemResource
+      RestApiId: !Ref ApiGatewayRestApi
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.querystring.tableName : true
+      HttpMethod: POST
+      Integration:
+        ConnectionType: INTERNET
+        PassthroughBehavior: WHEN_NO_MATCH
+        Credentials: !GetAtt ApiGatewayIamRole.Arn
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        RequestParameters:
+          integration.request.querystring.tableName: method.request.querystring.tableName
+        Uri: !Sub 
+        - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations"
+        - lambdaArn: !Ref dynamoDBCRUDWithApiGatewayFunctionArn
+
+  DeleteItemResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: 'deleteitem'
+      RestApiId: !Ref ApiGatewayRestApi
+
+  DeleteItemIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !Ref DeleteItemResource
+      PathPart: '{id}'
+      RestApiId: !Ref ApiGatewayRestApi
+  
+  DeleteItemMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ResourceId: !Ref DeleteItemIdResource
+      RestApiId: !Ref ApiGatewayRestApi
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.querystring.tableName : true
+      HttpMethod: DELETE
+      Integration:
+        ConnectionType: INTERNET
+        PassthroughBehavior: WHEN_NO_MATCH
+        Credentials: !GetAtt ApiGatewayIamRole.Arn
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        RequestParameters:
+          integration.request.querystring.tableName: method.request.querystring.tableName
+        Uri: !Sub 
+        - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations"
+        - lambdaArn: !Ref dynamoDBCRUDWithApiGatewayFunctionArn
+    
+  UpdateItemResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: 'updateitem'
+      RestApiId: !Ref ApiGatewayRestApi
+
+  UpdateItemIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !Ref UpdateItemResource
+      PathPart: '{id}'
+      RestApiId: !Ref ApiGatewayRestApi
+  
+  UpdateItemMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ResourceId: !Ref UpdateItemIdResource
+      RestApiId: !Ref ApiGatewayRestApi
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.querystring.tableName : true
+      HttpMethod: PUT
+      Integration:
+        ConnectionType: INTERNET
+        PassthroughBehavior: WHEN_NO_MATCH
+        Credentials: !GetAtt ApiGatewayIamRole.Arn
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        RequestParameters:
+          integration.request.querystring.tableName: method.request.querystring.tableName
+        Uri: !Sub 
+        - "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations"
+        - lambdaArn: !Ref dynamoDBCRUDWithApiGatewayFunctionArn
+  
+  ApiGatewayModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref ApiGatewayRestApi
+      Schema: {}
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiGatewayDeployment
+      Description: Stage for CRUD Operation with Lambda function integration
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: 'crud_stage'
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: 
+      - GetItemsMethod
+      - AddItemResource
+      - DeleteItemMethod
+      - UpdateItemMethod
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      # RoleName: Api_gateway_role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ''
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'apigateway.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 'lambda:*'
+                Resource: !Ref dynamoDBCRUDWithApiGatewayFunctionArn
+                  

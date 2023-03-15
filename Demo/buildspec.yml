@@ -1,0 +1,18 @@
+version: 0.2
+phases:
+  pre_build: # Represents the commands, if any, that CodeBuild runs before the build. For example, you might use this phase to sign in to Amazon ECR, or you might install npm dependencies.
+    commands: # Required sequence if pre_build is specified. Contains a sequence of scalars, where each scalar represents a single command that CodeBuild runs before the build. CodeBuild runs each command, one at a time, in the order listed, from beginning to end.
+      - echo "Validating CFN templates"
+      - echo "Validating serverless.yaml"
+      - aws cloudformation validate-template --template-body file://serverless.yaml
+      - BUCKET=${BuildOutput_S3_Bucket:-"serverless-deployment"} #if environment variable BuildOutput_S3_Bucket is not defined or empty, use the default
+
+  build: # Represents the commands, if any, that CodeBuild runs during the build. For example, you might use this phase to run Mocha, RSpec, or sbt.
+    commands: # Required if build is specified. Contains a sequence of scalars, where each scalar represents a single command that CodeBuild runs during the build. CodeBuild runs each command, one at a time, in the order listed, from beginning to end.
+      - aws cloudformation package --template-file serverless.yaml --s3-bucket $BUCKET --output-template-file serverless-deployment.yaml
+      # The command uploads local artifacts, such as source code for an AWS Lambda function or a Swagger file for an AWS API Gateway REST API, to an S3 bucket. The command returns a copy of your template, replacing references to local artifacts with the S3 location where the command uploaded the artifacts.
+      # - cat analytics-deployment.yaml
+artifacts: # Represents information about where CodeBuild can find the build output and how CodeBuild prepares it for uploading to the S3 output bucket.
+  type: zip
+  files:
+    - serverless-deployment.yaml

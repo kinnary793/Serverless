@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: DynamoDB KMS Configuration.
+
+Resources:
+  myDynamoDBTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: "serverless_demo" # A name for the table. If you don't specify a name, AWS CloudFormation generates a unique physical ID and uses that ID for the table name.
+        AttributeDefinitions: # A list of attributes that describe the key schema for the table and indexes.
+          - AttributeName: "user_id" # A name for the attribute.
+            AttributeType: "S" # S - the attribute is of type String, N - the attribute is of type Number, B - the attribute is of type Binary
+        KeySchema: # Specifies the attributes that make up the primary key for the table.
+          - AttributeName: "user_id" # The name of a key attribute.
+            KeyType: "HASH" # partition key
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5 # The maximum number of strongly consistent reads consumed per second before DynamoDB returns a ThrottlingException.
+          WriteCapacityUnits: 5 # The maximum number of writes consumed per second before DynamoDB returns a ThrottlingException.
+        

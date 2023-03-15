@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Serverless Architecture for performing CRUD operation in DynamoDB via Lambda and Api-Gateway.
+# To use the SAM transform, add AWS::Serverless-2016-10-31 to the Transform section of your CloudFormation template.
+Transform: AWS::Serverless-2016-10-31
+# The AWS Serverless Application Model (SAM) is an open-source framework for building serverless applications. It provides shorthand syntax to express functions, APIs, databases, and event source mappings. With just a few lines per resource, you can define the application you want and model it using YAML. During deployment, SAM transforms and expands the SAM syntax into AWS CloudFormation syntax, enabling you to build serverless applications faster.
+
+Resources:
+  # Lambda Layers
+  # dynamoDBCRUDWithApiGatewayInternalModules:
+  #   Type: AWS::Serverless::LayerVersion
+  #   Properties:
+  #     LayerName: lambda_functions
+  #     Description: Dependencies for the Onelink lambdas
+  #     ContentUri: ./lambda_functions
+  #     RetentionPolicy: Delete
+  #     CompatibleRuntimes:
+  #       - python3.9
+
+  # Lambda Functions
+  dynamoDBCRUDWithApiGatewayFunction:
+    Type: AWS::Serverless::Function
+    # Condition: CreateNonProdResources
+    Properties:
+      FunctionName: dynamoDB_crud_with_api_gateway
+      Handler: dynamoDB_crud_with_api_gateway.lambda_handler
+      Runtime: python3.9
+      Description: Used to perform crud operatoin using api_gateway
+      Role: !GetAtt dynamoDBCRUDWithApiGatewayRole.Arn
+      CodeUri: ./lambda_functions/dynamoDB_crud_with_api_gateway.py
+      # Layers:
+      #   - !Ref OnelinkAnalyticsInternalModules
+
+  # IAM Resources
+  dynamoDBCRUDWithApiGatewayRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: dynamoDBCRUDWithApiGatewayRole
+      AssumeRolePolicyDocument: # The trust policy that is associated with this role. Trust policies define which entities can assume the role. You can associate only one trust policy with a role.
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      # An AWS managed policy is a standalone policy that is created and administered by AWS.
+      # You can create standalone policies that you administer in your own AWS account, which we refer to as customer managed policies. You can then attach the policies to multiple principal entities in your AWS account.
+      # An inline policy is a policy that's embedded in an IAM identity (a user, group, or role).That is, the policy is an inherent part of the identity. You can create a policy and embed it in an identity, either when you create the identity or later.
+      Path: / # The path to the role. This parameter is optional. If it is not included, it defaults to a slash (/).
+      Policies: # Adds or updates an inline policy document that is embedded in the specified IAM role. The inline policy is used as part of the role's access (permissions) policy.
+        - PolicyName: customLambdaAccessPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: IAMAccess
+                Effect: Allow
+                Action: 
+                  - "iam:*"
+                Resource: 
+                  - "arn:aws:iam::*:role/*"
+              - Sid: DynamoDBIndexAndStreamAccess
+                Effect: Allow
+                Action:
+                  - "dynamodb:GetShardIterator"
+                  - "dynamodb:Scan"
+                  - "dynamodb:Query"
+                  - "dynamodb:DescribeStream"
+                  - "dynamodb:GetRecords"
+                Resource:
+                  - "arn:aws:dynamodb:us-east-2:699377644038:table/*/index/*"
+                  - "arn:aws:dynamodb:us-east-2:699377644038:table/*/stream/*"
+              - Sid: DynamoDBTableAccess
+                Effect: Allow
+                Action:
+                  - "dynamodb:BatchGetItem"
+                  - "dynamodb:BatchWriteItem"
+                  - "dynamodb:ConditionCheckItem"
+                  - "dynamodb:PutItem"
+                  - "dynamodb:DescribeTable"
+                  - "dynamodb:DeleteItem"
+                  - "dynamodb:CreateTable"
+                  - "dynamodb:GetItem"
+                  - "dynamodb:Scan"
+                  - "dynamodb:Query"
+                  - "dynamodb:UpdateItem"
+                Resource:
+                  - "arn:aws:dynamodb:us-east-2:699377644038:table/*"
+              - Sid: DynamoDBListStreamsAccess
+                Effect: Allow
+                Action:
+                  - "dynamodb:ListStreams"
+                Resource:
+                  - "arn:aws:dynamodb:us-east-2:699377644038:table/*/index/*"
+                  - "arn:aws:dynamodb:us-east-2:699377644038:table/*/stream/*"
+              - Sid: DynamoDBDescribeLimitsAccess
+                Effect: Allow
+                Action:
+                  - "dynamodb:DescribeLimits"
+                Resource:
+                  - "arn:aws:dynamodb:us-east-2:699377644038:table/*"
+                  - "arn:aws:dynamodb:us-east-2:699377644038:table/*/index/*"
+
+  # child stack
+  ApiGatewayStack:
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: 'api_gateway.yaml'
+      Parameters:
+        dynamoDBCRUDWithApiGatewayFunctionArn: !GetAtt dynamoDBCRUDWithApiGatewayFunction.Arn 
+  
+  # child stack
+  DynamoDBStack:
+    UpdateReplacePolicy: Retain
+    Type: AWS::CloudFormation::Stack
+    DeletionPolicy: Retain
+    Properties:
+      TemplateURL: 'dynamoDB.yaml'
